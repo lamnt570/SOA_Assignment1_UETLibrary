@@ -28,14 +28,11 @@ namespace Client
 
 		private Dictionary<string, FormBook> openingBook;
 
-		private FormWaiting formWaiting;
-
 		public FormMainPage()
 		{
 			InitializeComponent();
 			labelUserName.Text = "No Name";
 			openingBook = new Dictionary<string, FormBook>();
-			//init();
 		}
 
 		public FormMainPage(string userName)
@@ -43,7 +40,6 @@ namespace Client
 			InitializeComponent();
 			labelUserName.Text = userName;
 			openingBook = new Dictionary<string, FormBook>();
-			//init();
 		}
 
 		private void init()
@@ -59,73 +55,99 @@ namespace Client
 			redisplay();
 		}
 
-		WebResponse makeGetBooksRequest(int page)
+		private void showErrorMessage()
 		{
-			string request = Program.BASE_URL + "/books?limit=" + MAX_BOOKS_PER_PAGE + "&page=" + page;
-
-			WebRequest webRequest = WebRequest.Create(request);
-			webRequest.Credentials = CredentialCache.DefaultCredentials;
-
-			return webRequest.GetResponse();
+			string message = "Oops. Something went wrong.\nPlease try again later.";
+			string caption = "Error";
+			MessageBox.Show(message, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
 		}
 
-		WebResponse makeSearchBooksRequest(int page)
+		private WebResponse makeGetBooksRequest(int page)
 		{
-			string query = textBoxSearch.Text;
-			if (query == null) query = "";
-			string request = Program.BASE_URL + "/book/search?q=" + query + "&limit=" + MAX_BOOKS_PER_PAGE + "&page=" + page;
+			try
+			{
+				string request = Program.BASE_URL + "/books?limit=" + MAX_BOOKS_PER_PAGE + "&page=" + page;
 
-			WebRequest webRequest = WebRequest.Create(request);
-			webRequest.Credentials = CredentialCache.DefaultCredentials;
+				WebRequest webRequest = WebRequest.Create(request);
+				webRequest.Credentials = CredentialCache.DefaultCredentials;
 
-			return webRequest.GetResponse();
+				return webRequest.GetResponse();
+			}
+			catch(Exception e)
+			{
+				throw e;
+			}
+		}
+
+		private WebResponse makeSearchBooksRequest(int page)
+		{
+			try
+			{
+				string query = textBoxSearch.Text;
+				if (query == null) query = "";
+				string request = Program.BASE_URL + "/book/search?q=" + query + "&limit=" + MAX_BOOKS_PER_PAGE + "&page=" + page;
+
+				WebRequest webRequest = WebRequest.Create(request);
+				webRequest.Credentials = CredentialCache.DefaultCredentials;
+
+				return webRequest.GetResponse();
+			}
+			catch (Exception e)
+			{
+				throw e;
+			}
 		}
 
 		private void getBookCovers()
 		{
 			for (int i = 0; i < books.Count; i++)
 			{
-				books[i].getCover();
-				if (books[i].cover != null)
+				try
 				{
-					//page[i].cover = books[i].cover;
-					DataGridViewCell cell = dataGridViewBookPreview.Rows[i].Cells[0];
-					cell.Value = books[i].cover;
+					books[i].getCover();
+					if (books[i].cover != null)
+					{
+						DataGridViewCell cell = dataGridViewBookPreview.Rows[i].Cells[0];
+						cell.Value = books[i].cover;
+					}
+				}
+				catch
+				{
+					continue;
 				}
 			}
 		}
 
-		private void showWaitingForm()
+		private bool getPage()
 		{
-			formWaiting.Show();
-		}
-
-		private void getPage()
-		{
-			//Thread waitingThread = new Thread(showWaitingForm);
-			//waitingThread.Start();
-	
 			if (getBookCoversThread != null && getBookCoversThread.IsAlive)
 			{
 				getBookCoversThread.Abort();
 				getBookCoversThread = null;
 			}
-			
-			WebResponse response;
-			if (!useSearch)
-				response = makeGetBooksRequest(pageCur + 1);
-			else
-				response = makeSearchBooksRequest(pageCur + 1);
-			JsonObject json = (JsonObject)JsonObject.Load(response.GetResponseStream());
 
-			//waitingThread.Abort();
+			WebResponse response;
+			try
+			{
+				if (!useSearch)
+					response = makeGetBooksRequest(pageCur + 1);
+				else
+					response = makeSearchBooksRequest(pageCur + 1);
+			}
+			catch
+			{
+				showErrorMessage();
+				return false;
+			}
+
+			JsonObject json = (JsonObject)JsonObject.Load(response.GetResponseStream());
 
 			// check status
 			string status = (string)json["status"];
 			if (!status.Equals("ok"))
 			{
 				MessageBox.Show("Fail to load page.");
-				return;
+				return false;
 			}
 
 			// update total page number
@@ -147,19 +169,22 @@ namespace Client
 			// make new thread to load cover book
 			getBookCoversThread = new Thread(getBookCovers);
 			getBookCoversThread.Start();
+
+			return true;
 		}
 
 		private void displayPage()
 		{
+			if (page.Count > 4)
+				dataGridViewBookPreview.Columns[1].Width = 313;
+			else
+				dataGridViewBookPreview.Columns[1].Width = 330;
+
 			dataGridViewBookPreview.DataSource = null;
 			if (page.Count == 0)
 				return;
 			dataGridViewBookPreview.DataSource = page;
 
-			if (page.Count > 4)
-				dataGridViewBookPreview.Columns[1].Width = 313;
-			else
-				dataGridViewBookPreview.Columns[1].Width = 330;
 			dataGridViewBookPreview.CurrentCell = dataGridViewBookPreview.Rows[0].Cells[0];
 		}
 
@@ -176,16 +201,22 @@ namespace Client
 
 		private void buttonNextPage_Click(object sender, EventArgs e)
 		{
+			buttonNextPage.Enabled = false;
 			pageCur++;
-			getPage();
+			if (!getPage())
+				pageCur--;
 			redisplay();
+			buttonNextPage.Enabled = true;
 		}
 
 		private void buttonPrevPage_Click(object sender, EventArgs e)
 		{
+			buttonPrevPage.Enabled = false;
 			pageCur--;
-			getPage();
+			if (!getPage())
+				pageCur++;
 			redisplay();
+			buttonPrevPage.Enabled = true;
 		}
 
 		private void linkSignOut_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
@@ -290,17 +321,25 @@ namespace Client
 			DialogResult res = MessageBox.Show(message, caption, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 			if (res == DialogResult.Yes)
 			{
-				if (!sendDeleteRequest(book.id))
+				try
 				{
-					const string message2 = "Cannot delete book right now.\nPlease try again later.";
-					const string caption2 = "Delete fail";
-					MessageBox.Show(message2, caption2, MessageBoxButtons.OK, MessageBoxIcon.Error);
-					return;
+					if (!sendDeleteRequest(book.id))
+					{
+						const string message2 = "Cannot delete book right now.\nPlease try again later.";
+						const string caption2 = "Delete fail";
+						MessageBox.Show(message2, caption2, MessageBoxButtons.OK, MessageBoxIcon.Error);
+						return;
+					}
+					else
+					{
+						MessageBox.Show("Successfully delete book.", "Delete", MessageBoxButtons.OK);
+						reloadPage();
+						return;
+					}
 				}
-				else
+				catch
 				{
-					MessageBox.Show("Successfully delete book.", "Delete", MessageBoxButtons.OK);
-					reloadPage();
+					showErrorMessage();
 					return;
 				}
 			}
@@ -309,31 +348,40 @@ namespace Client
 
 		private bool sendDeleteRequest(string bookId)
 		{
-			string requestUri = Program.BASE_URL + "/book/delete";
+			try
+			{
+				string requestUri = Program.BASE_URL + "/book/delete";
 
-			Dictionary<string, string> dict = new Dictionary<string, string>();
-			dict.Add("id", bookId);
-			FormUrlEncodedContent content = new FormUrlEncodedContent(dict);
+				Dictionary<string, string> dict = new Dictionary<string, string>();
+				dict.Add("id", bookId);
+				FormUrlEncodedContent content = new FormUrlEncodedContent(dict);
 
-			if (client == null)
-				client = new HttpClient();
-			HttpResponseMessage result = client.PutAsync(requestUri, content).Result;
+				if (client == null)
+					client = new HttpClient();
+				HttpResponseMessage result = client.PutAsync(requestUri, content).Result;
 
-			JsonObject obj = (JsonObject)JsonObject.Load(result.Content.ReadAsStreamAsync().Result);
-			string status = (string)obj["status"];
-			if (!status.Equals("ok"))
-				return false;
+				JsonObject obj = (JsonObject)JsonObject.Load(result.Content.ReadAsStreamAsync().Result);
+				string status = (string)obj["status"];
+				if (!status.Equals("ok"))
+					return false;
 
-			return true;
+				return true;
+			}
+			catch (Exception e)
+			{
+				throw e;
+			}
 		}
 
 		private void buttonSearch_Click(object sender, EventArgs e)
 		{
+			buttonSearch.Enabled = false;
 			useSearch = true;
 			pageCur = pageNum = 0;
 
 			getPage();
 			redisplay();
+			buttonSearch.Enabled = true;
 		}
 
 		private void buttonClear_Click(object sender, EventArgs e)
@@ -385,7 +433,6 @@ namespace Client
 
 		private void FormMainPage_Load(object sender, EventArgs e)
 		{
-			formWaiting = new FormWaiting();
 			init();
 		}
 

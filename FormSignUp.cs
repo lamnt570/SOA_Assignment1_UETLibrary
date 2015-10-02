@@ -26,6 +26,13 @@ namespace Client
 			client = new HttpClient();
 		}
 
+		private void showErrorMessage()
+		{
+			string message = "Oops. Something went wrong.\nPlease try again later.";
+			string caption = "Error";
+			MessageBox.Show(message, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+		}
+
 		private void buttonSignUp_Click(object sender, EventArgs e)
 		{
 			if (!infoValid())
@@ -36,35 +43,54 @@ namespace Client
 				return;
 			}
 
-			if (!register())
+			buttonSignUp.Enabled = false;
+			try
 			{
-				labelSignUpFail.Visible = true;
+				if (!register())
+				{
+					labelSignUpFail.Visible = true;
+					buttonSignUp.Enabled = true;
+					return;
+				}
+			}
+			catch
+			{
+				showErrorMessage();
+				buttonSignUp.Enabled = true;
 				return;
 			}
 
 			string message = "Your account has been created.\nPlease check email to complete the registation.";
-			string caption = "Register";
+			string caption = "Success";
 			MessageBox.Show(message, caption);
+
 			this.Close();
 		}
 
 		private bool register()
 		{
-			string uri = Program.BASE_URL + "/account/register";
+			try
+			{
+				string uri = Program.BASE_URL + "/account/register";
 
-			MultipartFormDataContent content = new MultipartFormDataContent();
-			content.Add(new StringContent(textBoxEmail.Text), "email");
-			content.Add(new StringContent(textBoxUserName.Text), "name");
-			content.Add(new StringContent(textBoxPassword.Text), "password");
+				MultipartFormDataContent content = new MultipartFormDataContent();
+				content.Add(new StringContent(textBoxEmail.Text), "email");
+				content.Add(new StringContent(textBoxUserName.Text), "name");
+				content.Add(new StringContent(textBoxPassword.Text), "password");
 
-			HttpResponseMessage result = client.PostAsync(uri, content).Result;
-			JsonObject obj = (JsonObject)JsonObject.Load(result.Content.ReadAsStreamAsync().Result);
+				HttpResponseMessage result = client.PostAsync(uri, content).Result;
+				JsonObject obj = (JsonObject)JsonObject.Load(result.Content.ReadAsStreamAsync().Result);
 
-			string status = (string)obj["status"];
-			if (!status.Equals("ok"))
-				return false;
+				string status = (string)obj["status"];
+				if (!status.Equals("ok"))
+					return false;
 
-			return true;
+				return true;
+			}
+			catch (Exception e)
+			{
+				throw e;
+			}
 		}
 
 		private bool infoValid()

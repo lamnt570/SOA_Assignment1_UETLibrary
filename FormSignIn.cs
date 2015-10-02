@@ -8,7 +8,6 @@ namespace Client
 {
 	public partial class FormSignIn : Form
 	{
-
 		private HttpClient client;
 
 		private string username;
@@ -20,11 +19,29 @@ namespace Client
 			client = new HttpClient();
 		}
 
+		private void showErrorMessage()
+		{
+			string message = "Oops. Something went wrong.\nPlease try again later.";
+			string caption = "Error";
+			MessageBox.Show(message, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+		}
+
 		private void buttonSignIn_Click(object sender, EventArgs e)
 		{
-			if (!checkSignIn())
+			buttonSignIn.Enabled = false;
+			try
 			{
-				labelSignInFail.Visible = true;
+				if (!checkSignIn())
+				{
+					labelSignInFail.Visible = true;
+					buttonSignIn.Enabled = true;
+					return;
+				}
+			}
+			catch
+			{
+				showErrorMessage();
+				buttonSignIn.Enabled = true;
 				return;
 			}
 
@@ -35,32 +52,36 @@ namespace Client
 
 			// user sign out
 			clearAll();
+			buttonSignIn.Enabled = true;
 			this.Show();
 		}
 
 		private bool checkSignIn()
 		{
-			string uri = Program.BASE_URL + "/account/login";
-
-			MultipartFormDataContent content = new MultipartFormDataContent();
-			content.Add(new StringContent(textBoxUserName.Text), "email");
-			content.Add(new StringContent(textBoxPassword.Text), "password");
-
-			HttpResponseMessage result = client.PostAsync(uri, content).Result;
-
-			JsonObject obj = (JsonObject)JsonObject.Load(result.Content.ReadAsStreamAsync().Result);
-			string status = (string)obj["status"];
-			if (!status.Equals("ok"))
+			try
 			{
-				//waitingThread.Abort();
-				return false;
+				string uri = Program.BASE_URL + "/account/login";
+
+				MultipartFormDataContent content = new MultipartFormDataContent();
+				content.Add(new StringContent(textBoxUserName.Text), "email");
+				content.Add(new StringContent(textBoxPassword.Text), "password");
+
+				HttpResponseMessage result = client.PostAsync(uri, content).Result;
+
+				JsonObject obj = (JsonObject)JsonObject.Load(result.Content.ReadAsStreamAsync().Result);
+				string status = (string)obj["status"];
+				if (!status.Equals("ok"))
+					return false;
+
+				JsonObject data = (JsonObject)obj["data"];
+				username = (string)data["name"];
+
+				return true;
 			}
-
-			JsonObject data = (JsonObject)obj["data"];
-			username = (string)data["name"];
-
-			//waitingThread.Abort();
-			return true;
+			catch (Exception e)
+			{
+				throw e;
+			}
 		}
 
 		private void clearAll()

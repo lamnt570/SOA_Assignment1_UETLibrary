@@ -17,7 +17,6 @@ D:\UET_15~16\HKI\SOA\Assignment 1\Client\Client\obj\Debug\Client.exe
 D:\UET_15~16\HKI\SOA\Assignment 1\Client\Client\obj\Debug\Client.pdb
 D:\UET_15~16\HKI\SOA\Assignment 1\Client\Client\obj\Debug\Client.csprojResolveAssemblyReference.cache
 D:\UET_15~16\HKI\SOA\Assignment 1\Client\Client\obj\Debug\Client.FormSignUp.resources
-D:\UET_15~16\HKI\SOA\Assignment 1\Client\Client\obj\Debug\Client.FormWaiting.resources
 D:\UET_15~16\HKI\SOA\Assignment 1\Client\Client\bin\Debug\Client.exe.manifest
 D:\UET_15~16\HKI\SOA\Assignment 1\Client\Client\bin\Debug\Client.application
 D:\UET_15~16\HKI\SOA\Assignment 1\Client\Client\obj\Debug\Client.exe.manifest
